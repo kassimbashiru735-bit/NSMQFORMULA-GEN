@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
+<title>NSMQ FormulaGen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F7F7FB;
+    --card:#FFFFFF;
+    --border:#E9E8F0;
+    --ink:#17171C;
+    --ink-soft:#8A8A93;
+    --ink-dim:#B7B6C0;
+    --purple:#6C4FE0;
+    --purple-dark:#5B3FCB;
+    --purple-soft:#EFEAFE;
+    --purple-shadow:rgba(108,79,224,0.22);
+    --teal:#16B88A;
+    --teal-soft:#E3F9F1;
+    --danger:#E0483E;
+    --danger-soft:#FCEAE9;
+    --paper:var(--bg);
+    --paper-raised:var(--card);
+    --line:var(--border);
+    --radius:20px;
+    --safe-top:env(safe-area-inset-top, 0px);
+    --safe-bottom:env(safe-area-inset-bottom, 0px);
+    --safe-left:env(safe-area-inset-left, 0px);
+    --safe-right:env(safe-area-inset-right, 0px);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0; overscroll-behavior-y:none;}
+  html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    font-size:16px;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    min-height:100dvh;
+    padding-bottom:calc(84px + var(--safe-bottom));
+    padding-left:var(--safe-left);
+    padding-right:var(--safe-right);
+    position:relative;
+  }
+  h1,h2,h3,.mono,.display{font-family:'Inter',sans-serif;}
+  .formula, .value-tag, input.sym-input, .const-value, .step-index{
+    font-family:'JetBrains Mono', monospace;
+  }
+
+  /* ---------- header ---------- */
+  header{
+    position:sticky; top:0; z-index:30;
+    background:rgba(255,255,255,0.92);
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+    color:var(--ink);
+    padding:calc(8px + var(--safe-top)) 18px 8px;
+    display:flex; align-items:center; justify-content:space-between;
+    border-bottom:1px solid var(--border);
+  }
+  header .brand{display:flex; align-items:center; gap:10px; min-width:0;}
+  header .brand .mark{
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:13px;
+    background:var(--purple);
+    color:#fff; padding:4px 8px; border-radius:8px;
+    flex:none;
+  }
+  header h1{
+    font-size:16px; margin:0; font-weight:800; letter-spacing:-0.2px; white-space:nowrap;
+    color:var(--ink);
+    overflow:hidden; text-overflow:ellipsis;
+  }
+  header .actions{display:flex; gap:8px; flex:none;}
+  .icon-btn{
+    background:var(--purple-soft); border:none; color:var(--purple);
+    width:44px; height:44px; border-radius:50%; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:700;
+    transition:background .2s;
+    touch-action:manipulation; -webkit-user-select:none; user-select:none;
+  }
+  .icon-btn:active{background:#E1D9FD;}
+
+  main{max-width:640px; margin:0 auto; padding:8px 14px 28px; position:relative; z-index:1;}
+
+  /* ---------- step card ---------- */
+  .step{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    margin-bottom:20px;
+    position:relative;
+    padding:14px 14px;
+    display:none;
+    box-shadow:0 1px 3px rgba(20,20,40,0.04), 0 8px 24px -16px rgba(20,20,40,0.08);
+  }
+  .step.active{display:block; animation:rise .35s ease;}
+  @keyframes rise{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);}}
+  .step::before{ content:none; }
+  .step::after{ content:none; }
+
+  .step-head{display:flex; align-items:center; gap:12px; margin-bottom:8px; position:relative;}
+  .step-index{
+    font-size:12px; font-weight:700; color:var(--purple); letter-spacing:0.5px;
+    background:var(--purple-soft); padding:5px 9px; border-radius:9px;
+  }
+  .step-title{font-size:19px; font-weight:800; margin:0; letter-spacing:-0.2px; color:var(--ink);}
+  .step-sub{font-size:14px; color:var(--ink-soft); margin:-2px 0 10px; font-family:'Inter',sans-serif; font-weight:500;}
+
+  /* ---------- capture section ---------- */
+  .capture-row{display:flex; gap:10px; margin-bottom:10px;}
+  .capture-btn{
+    flex:1; padding:12px 10px; border:1.5px solid var(--border); background:#FBFAFF;
+    border-radius:16px; min-height:50px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+    cursor:pointer; font-family:'Inter',sans-serif; font-size:13px; font-weight:700; letter-spacing:0.1px;
+    color:var(--ink); transition:all .15s;
+    touch-action:manipulation; -webkit-user-select:none; user-select:none;
+  }
+  .capture-btn:active{background:var(--purple-soft); border-color:var(--purple);}
+  .capture-btn .glyph{font-size:26px;}
+  #previewWrap{display:none; margin-bottom:14px;}
+  #previewWrap img{width:100%; max-height:280px; object-fit:contain; border:1px solid var(--border); border-radius:14px; background:#fff;}
+  #previewMeta{font-size:12px; color:var(--ink-soft); margin-top:6px; display:flex; justify-content:space-between; align-items:center; font-family:'Inter',sans-serif;}
+  #previewMeta button{background:none; border:none; color:var(--danger); font-family:'Inter',sans-serif; font-weight:700; font-size:13px; cursor:pointer; text-decoration:underline; padding:8px 0; touch-action:manipulation;}
+
+  .or-divider{
+    display:flex; align-items:center; gap:12px; margin:10px 0; color:var(--ink-dim);
+    font-family:'Inter',sans-serif; font-size:11px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase;
+  }
+  .or-divider::before, .or-divider::after{content:""; flex:1; height:1px; background:var(--border);}
+
+  #typeWrap textarea{
+    width:100%; padding:14px; border:1.5px solid var(--border); border-radius:14px; background:#FBFAFF;
+    color:var(--ink); font-size:16px; font-family:'Inter',sans-serif; font-weight:500; resize:vertical;
+    min-height:44px; margin-bottom:4px;
+  }
+  #typeWrap textarea:focus{outline:none; border-color:var(--purple); box-shadow:0 0 0 3px var(--purple-soft);}
+  #typeWrap textarea::placeholder{color:var(--ink-dim);}
+  #captureSymbolPalette{margin-bottom:2px;}
+
+  .btn{
+    font-family:'Inter',sans-serif; font-weight:700; font-size:15px; letter-spacing:0;
+    padding:12px 18px; border:none; cursor:pointer; border-radius:14px; min-height:44px;
+    width:100%; position:relative; transition:all .15s;
+    touch-action:manipulation; -webkit-user-select:none; user-select:none;
+  }
+  .btn-primary{
+    background:var(--purple);
+    color:#fff; box-shadow:0 8px 20px -8px var(--purple-shadow);
+  }
+  .btn-primary:disabled{background:#EDEDF2; color:var(--ink-dim); box-shadow:none; cursor:not-allowed;}
+  .btn-primary:active:not(:disabled){background:var(--purple-dark);}
+  .btn-ghost{background:#FBFAFF; border:1.5px solid var(--border); color:var(--ink);}
+  .btn-ghost:active{border-color:var(--purple); background:var(--purple-soft);}
+  .btn-small{width:auto; padding:11px 16px; font-size:13px;}
+
+  #status{font-size:13px; color:var(--ink-soft); margin-top:12px; display:none; align-items:center; gap:10px; font-family:'Inter',sans-serif; font-weight:600;}
+  .scan-line{width:34px; height:6px; border-radius:3px; background:var(--purple-soft); overflow:hidden; position:relative; flex:none;}
+  .scan-line span{position:absolute; top:0; left:0; width:40%; height:100%; background:var(--purple); animation:scan 1.1s ease-in-out infinite;}
+  @keyframes scan{0%{left:-40%;} 100%{left:100%;}}
+  #errorBox{display:none; background:var(--danger-soft); border:1px solid #F5C6C3; color:var(--danger); padding:12px 14px; border-radius:12px; font-size:13px; margin-top:12px; font-family:'Inter',sans-serif; font-weight:600;}
+
+  /* ---------- formula display ---------- */
+  .subject-tag{
+    display:inline-block; font-family:'Inter',sans-serif; font-size:11px; font-weight:700;
+    letter-spacing:0.4px; background:var(--teal-soft); color:var(--teal); padding:5px 10px; margin-bottom:14px;
+    border-radius:20px;
+  }
+  .question-echo{
+    font-size:14px; color:var(--ink-soft); font-style:italic; border-left:3px solid var(--purple-soft);
+    padding-left:12px; margin-bottom:18px; font-family:'Inter',sans-serif; font-weight:500;
+  }
+  .formula-display{
+    font-size:22px; font-weight:700; color:var(--purple); background:var(--purple-soft);
+    border:none; border-radius:14px; padding:16px; margin-bottom:18px; overflow-x:auto; white-space:nowrap;
+  }
+  .def-list{list-style:none; margin:0 0 18px; padding:0;}
+  .def-list li{display:flex; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); font-size:14.5px; font-weight:500;}
+  .def-list li:last-child{border-bottom:none;}
+  .def-sym{font-weight:700; color:var(--purple); min-width:34px; font-size:15px; font-family:'JetBrains Mono',monospace;}
+  .def-name{flex:1;}
+  .def-name .unit{color:var(--ink-soft); font-size:12px;}
+
+  .subhead{font-family:'Inter',sans-serif; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--ink-soft); margin:20px 0 10px;}
+
+  .const-list{list-style:none; margin:0 0 16px; padding:0;}
+  .const-list li{display:flex; align-items:center; gap:10px; padding:11px 12px; background:#FBFAFF; border:1px solid var(--border); border-radius:12px; margin-bottom:6px; font-size:13px;}
+  .const-sym{font-weight:700; color:var(--purple); min-width:30px; font-family:'JetBrains Mono',monospace;}
+  .const-name{flex:1; font-family:'Inter',sans-serif; font-weight:500;}
+  .const-value{color:var(--ink); font-size:12.5px; white-space:nowrap;}
+
+  .given-row{display:flex; align-items:center; gap:10px; margin-bottom:9px;}
+  .given-row label{font-weight:700; color:var(--purple); min-width:28px; font-family:'JetBrains Mono',monospace;}
+  input.sym-input{
+    flex:1; padding:13px 12px; border:1.5px solid var(--border); background:#FBFAFF; font-size:16px; color:var(--ink);
+    border-radius:12px; font-family:'JetBrains Mono',monospace; min-height:44px;
+  }
+  input.sym-input:focus{outline:none; border-color:var(--purple); box-shadow:0 0 0 3px var(--purple-soft);}
+  .given-row .unit-badge{font-size:11px; color:var(--ink-soft); min-width:36px; font-family:'JetBrains Mono',monospace;}
+
+  .symbol-palette{
+    display:flex; flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; gap:6px; padding:6px 0 8px;
+    border-top:1px solid var(--border); border-bottom:1px solid var(--border); margin:8px 0 10px;
+    scrollbar-width:thin;
+  }
+  .symbol-palette button{
+    flex:none; width:36px; height:36px; border:1px solid var(--border); background:#FBFAFF;
+    border-radius:10px; font-family:'JetBrains Mono',monospace; font-size:15px; cursor:pointer; color:var(--purple);
+    transition:all .15s; touch-action:manipulation; -webkit-user-select:none; user-select:none;
+  }
+  .symbol-palette button:active{background:var(--purple-soft); border-color:var(--purple);}
+
+  /* ---------- simplify ---------- */
+  .arith-block{
+    background:#FBFAFF; border:1px solid var(--border); border-radius:14px; padding:14px 16px; margin-bottom:16px;
+    font-family:'JetBrains Mono',monospace; font-size:13px; line-height:1.8; white-space:pre-wrap; color:var(--ink-soft);
+  }
+  .simplified-formula{
+    font-size:24px; font-weight:800; color:var(--purple); background:var(--purple-soft);
+    border:none; border-radius:16px; padding:20px; text-align:center; margin-bottom:8px; overflow-x:auto;
+  }
+  .simplified-label{text-align:center; font-size:11px; color:var(--ink-soft); font-family:'Inter',sans-serif; font-weight:700; letter-spacing:0.8px; margin-bottom:18px;}
+
+  /* ---------- solve ---------- */
+  .solve-steps{list-style:none; margin:0 0 18px; padding:0; counter-reset:step;}
+  .solve-steps li{
+    counter-increment:step; position:relative; padding:12px 0 12px 34px; border-bottom:1px solid var(--border);
+    font-family:'JetBrains Mono',monospace; font-size:13.5px; color:var(--ink);
+  }
+  .solve-steps li:last-child{border-bottom:none;}
+  .solve-steps li::before{
+    content:counter(step); position:absolute; left:0; top:11px; width:22px; height:22px;
+    background:var(--purple); color:#fff; font-family:'Inter',sans-serif; font-size:11px; font-weight:700;
+    display:flex; align-items:center; justify-content:center; border-radius:50%;
+  }
+  .final-answer{
+    background:var(--teal-soft);
+    border:none;
+    color:var(--ink); padding:22px; text-align:center; margin-top:8px; border-radius:16px;
+  }
+  .final-answer .label{font-family:'Inter',sans-serif; font-size:11px; font-weight:700; letter-spacing:1px; opacity:0.9; margin-bottom:8px; color:var(--teal);}
+  .final-answer .value{font-family:'JetBrains Mono',monospace; font-size:25px; font-weight:800; color:var(--ink);}
+
+  .recalc-row{display:flex; gap:10px; margin-top:8px;}
+
+  /* ---------- constants sheet ---------- */
+  .sheet-overlay{
+    position:fixed; inset:0; background:rgba(23,23,28,0.4); z-index:50; display:none;
+  }
+  .sheet-overlay.open{display:block;}
+  .sheet{
+    position:fixed; left:0; right:0; bottom:0; max-height:80vh; max-height:80dvh; background:var(--card);
+    z-index:51; transform:translateY(100%); transition:transform .3s cubic-bezier(.2,.8,.3,1);
+    border-top:1px solid var(--border); box-shadow:0 -8px 40px -10px rgba(20,20,40,0.15);
+    border-radius:24px 24px 0 0;
+    display:flex; flex-direction:column;
+    padding-bottom:var(--safe-bottom);
+  }
+  .sheet.open{transform:translateY(0);}
+  .sheet-head{display:flex; justify-content:space-between; align-items:center; padding:18px 18px 14px; border-bottom:1px solid var(--border);}
+  .sheet-head h2{font-size:16px; margin:0; letter-spacing:-0.2px; color:var(--ink); font-weight:800;}
+  .sheet-body{overflow-y:auto; -webkit-overflow-scrolling:touch; padding:14px 18px 26px;}
+  .sheet input#constSearch{
+    width:100%; padding:12px 14px; border:1.5px solid var(--border); border-radius:12px; background:#FBFAFF;
+    color:var(--ink); font-size:16px; margin-bottom:14px; font-family:'Inter',sans-serif; font-weight:500;
+  }
+  .sheet input#constSearch:focus{outline:none; border-color:var(--purple); box-shadow:0 0 0 3px var(--purple-soft);}
+  .const-group-title{font-family:'Inter',sans-serif; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--purple); margin:16px 0 8px;}
+
+  footer{
+    position:fixed; bottom:calc(14px + var(--safe-bottom)); left:calc(14px + var(--safe-left)); right:calc(14px + var(--safe-right)); z-index:20;
+    background:var(--card);
+    border:1px solid var(--border); border-radius:20px;
+    display:flex; box-shadow:0 12px 32px -12px rgba(20,20,40,0.18);
+  }
+  footer button{
+    flex:1; background:none; border:none; padding:10px 4px; font-family:'Inter',sans-serif;
+    font-size:10.5px; font-weight:600; letter-spacing:0.1px; color:var(--ink-soft); cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:4px;
+    transition:color .2s; min-height:52px;
+    touch-action:manipulation; -webkit-user-select:none; user-select:none;
+  }
+  footer button .glyph{
+    font-size:16px; width:32px; height:26px; display:flex; align-items:center; justify-content:center;
+    border-radius:10px; transition:background .2s;
+  }
+  footer button.active{color:var(--purple); font-weight:700;}
+  footer button.active .glyph{background:var(--purple-soft);}
+
+  ::selection{background:var(--purple-soft); color:var(--ink);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="mark">ƒ(x)</span>
+    <h1>NSMQ FormulaGen</h1>
+  </div>
+  <div class="actions">
+    <button class="icon-btn" id="openConstants" title="Constants library">C</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- ===================== STEP 1 : CAPTURE ===================== -->
+  <section class="step active" data-accent="navy" id="stepCapture">
+    <div class="step-head">
+      <span class="step-index">01</span>
+      <h2 class="step-title">Capture the question</h2>
+    </div>
+    <p class="step-sub">Photograph or upload the question. NSMQ FormulaGen reads it and finds the formula it needs.</p>
+
+    <div class="capture-row">
+      <label class="capture-btn">
+        <span class="glyph">&#128247;</span>
+        Take photo
+        <input type="file" accept="image/*" capture="environment" id="cameraInput" hidden>
+      </label>
+      <label class="capture-btn">
+        <span class="glyph">&#128193;</span>
+        Upload image
+        <input type="file" accept="image/*" id="galleryInput" hidden>
+      </label>
+    </div>
+
+    <div id="previewWrap">
+      <img id="previewImg" alt="Question preview">
+      <div id="previewMeta">
+        <span id="previewName">image.jpg</span>
+        <button id="clearImage">Remove</button>
+      </div>
+    </div>
+
+    <div class="or-divider" id="orDivider"><span>or type it instead</span></div>
+
+    <div id="typeWrap">
+      <textarea id="typedQuestion" rows="3" placeholder="e.g. Calculate the energy of a photon with a wavelength of 500 nm."></textarea>
+      <div class="symbol-palette" id="captureSymbolPalette"></div>
+    </div>
+
+    <button class="btn btn-primary" id="analyzeBtn" disabled>Analyze question</button>
+    <div id="status"><div class="scan-line"><span></span></div><span id="statusText">Reading the question…</span></div>
+    <div id="errorBox"></div>
+  </section>
+
+  <!-- ===================== STEP 2 : FORMULA ===================== -->
+  <section class="step" data-accent="amber" id="stepFormula">
+    <div class="step-head">
+      <span class="step-index">02</span>
+      <h2 class="step-title">The formula</h2>
+    </div>
+    <span class="subject-tag" id="subjectTag">SUBJECT</span>
+    <p class="question-echo" id="questionEcho"></p>
+
+    <div class="formula-display" id="formulaDisplay"></div>
+
+    <div class="subhead">Variables &amp; constants</div>
+    <ul class="def-list" id="defList"></ul>
+
+    <div class="subhead">Standard constant values</div>
+    <ul class="const-list" id="constUsedList"></ul>
+
+    <div class="subhead">Given in the question — edit if needed</div>
+    <div id="givenList"></div>
+
+    <div class="symbol-palette" id="symbolPalette"></div>
+
+    <button class="btn btn-primary" id="continueToSimplify">Continue to simplification</button>
+  </section>
+
+  <!-- ===================== STEP 3 : SIMPLIFY ===================== -->
+  <section class="step" data-accent="amber" id="stepSimplify">
+    <div class="step-head">
+      <span class="step-index">03</span>
+      <h2 class="step-title">Simplify the formula</h2>
+    </div>
+    <p class="step-sub">Constants collapse into a single working coefficient.</p>
+
+    <div class="subhead">Working</div>
+    <div class="arith-block" id="arithBlock"></div>
+
+    <div class="simplified-formula" id="simplifiedFormulaBox"></div>
+    <div class="simplified-label">SIMPLIFIED FORM</div>
+
+    <button class="btn btn-primary" id="continueToSolve">Continue to solve</button>
+  </section>
+
+  <!-- ===================== STEP 4 : SOLVE ===================== -->
+  <section class="step" data-accent="sage" id="stepSolve">
+    <div class="step-head">
+      <span class="step-index">04</span>
+      <h2 class="step-title">Solve</h2>
+    </div>
+
+    <ol class="solve-steps" id="solveSteps"></ol>
+
+    <div class="final-answer">
+      <div class="label">FINAL ANSWER</div>
+      <div class="value" id="finalAnswer"></div>
+    </div>
+
+    <div class="recalc-row">
+      <button class="btn btn-ghost btn-small" id="editValuesBtn">Edit given values</button>
+      <button class="btn btn-ghost btn-small" id="startOverBtn">Start a new question</button>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <button class="active" data-step="stepCapture"><span class="glyph">&#128247;</span>Capture</button>
+  <button data-step="stepFormula"><span class="glyph">ƒ</span>Formula</button>
+  <button data-step="stepSimplify"><span class="glyph">≈</span>Simplify</button>
+  <button data-step="stepSolve"><span class="glyph">=</span>Solve</button>
+</footer>
+
+<!-- ===================== CONSTANTS SHEET ===================== -->
+<div class="sheet-overlay" id="constantsOverlay">
+  <div class="sheet" id="constantsSheet">
+    <div class="sheet-head">
+      <h2>Constants library</h2>
+      <button class="icon-btn" id="closeConstants">&times;</button>
+    </div>
+    <div class="sheet-body">
+      <input type="text" id="constSearch" placeholder="Search constants (e.g. Planck, π, Avogadro)">
+      <div id="constLibraryList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============================================================
+     CONSTANTS LIBRARY
+     ============================================================ */
+  const CONSTANTS_LIBRARY = {
+    "Physics": [
+      {symbol:"h", name:"Planck's constant", value:"6.62607015 × 10⁻³⁴", unit:"J·s"},
+      {symbol:"ħ", name:"Reduced Planck's constant", value:"1.054571817 × 10⁻³⁴", unit:"J·s"},
+      {symbol:"c", name:"Speed of light in vacuum", value:"2.99792458 × 10⁸", unit:"m/s"},
+      {symbol:"G", name:"Gravitational constant", value:"6.674 × 10⁻¹¹", unit:"N·m²/kg²"},
+      {symbol:"g", name:"Standard gravity (Earth)", value:"9.80665", unit:"m/s²"},
+      {symbol:"e", name:"Elementary charge", value:"1.602176634 × 10⁻¹⁹", unit:"C"},
+      {symbol:"mₑ", name:"Electron rest mass", value:"9.1093837015 × 10⁻³¹", unit:"kg"},
+      {symbol:"mₚ", name:"Proton rest mass", value:"1.67262192369 × 10⁻²⁷", unit:"kg"},
+      {symbol:"k", name:"Boltzmann constant", value:"1.380649 × 10⁻²³", unit:"J/K"},
+      {symbol:"kₑ", name:"Coulomb's constant", value:"8.9875517923 × 10⁹", unit:"N·m²/C²"},
+      {symbol:"ε₀", name:"Vacuum permittivity", value:"8.8541878128 × 10⁻¹²", unit:"F/m"},
+      {symbol:"μ₀", name:"Vacuum permeability", value:"1.25663706212 × 10⁻⁶", unit:"N/A²"},
+      {symbol:"σ", name:"Stefan–Boltzmann constant", value:"5.670374419 × 10⁻⁸", unit:"W/m²K⁴"},
+      {symbol:"R∞", name:"Rydberg constant", value:"1.0973731568 × 10⁷", unit:"m⁻¹"}
+    ],
+    "Chemistry": [
+      {symbol:"Nₐ", name:"Avogadro's number", value:"6.02214076 × 10²³", unit:"mol⁻¹"},
+      {symbol:"R", name:"Ideal gas constant", value:"8.314462618", unit:"J/mol·K"},
+      {symbol:"F", name:"Faraday constant", value:"96485.33212", unit:"C/mol"},
+      {symbol:"Vₘ", name:"Molar volume of ideal gas (STP)", value:"22.414", unit:"L/mol"},
+      {symbol:"atm", name:"Standard atmosphere", value:"101325", unit:"Pa"}
+    ],
+    "Math": [
+      {symbol:"π", name:"Pi", value:"3.14159265359", unit:"—"},
+      {symbol:"e", name:"Euler's number", value:"2.71828182846", unit:"—"},
+      {symbol:"φ", name:"Golden ratio", value:"1.61803398875", unit:"—"},
+      {symbol:"γ", name:"Euler–Mascheroni constant", value:"0.5772156649", unit:"—"}
+    ]
+  };
+
+  const SYMBOLS = ["Δ","λ","π","θ","√","∑","∫","±","≈","≤","≥","∞","×10ⁿ","α","β","γ","μ","Ω","°","Å","∂","∇","→","·","²","³","₀","₁","ħ","φ"];
+
+  /* ============================================================
+     STATE
+     ============================================================ */
+  let state = {
+    imageBase64: null,
+    imageMime: null,
+    result: null,       // full parsed Gemini JSON
+    editedGivens: [],    // working copy of givenValues, editable
+    givensDirty: false
+  };
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ============================================================
+     BACKEND — Gemini API keys live server-side, as environment
+     variables on a small proxy you deploy once (see
+     functions/api/solve.js, built for Cloudflare Pages Functions).
+     Every device that opens this file talks to the same backend,
+     so keys are configured exactly once and apply everywhere, for
+     everyone, immediately — nobody enters or saves anything.
+     ============================================================ */
+  const DEFAULT_BACKEND_URL = "https://YOUR-PROJECT.pages.dev/api/solve"; // <-- admin: replace after deploying functions/api/solve.js
+
+  /* ============================================================
+     SHEETS (constants) — shared open/close
+     ============================================================ */
+  function toggleSheet(overlayId, sheetId, open){
+    const overlay = $(overlayId), sheet = $(sheetId);
+    if(open){
+      overlay.classList.add("open");
+      requestAnimationFrame(()=>sheet.classList.add("open"));
+    } else {
+      sheet.classList.remove("open");
+      setTimeout(()=>overlay.classList.remove("open"), 250);
+    }
+  }
+  $("constantsOverlay").addEventListener("click", (e)=>{ if(e.target.id==="constantsOverlay") toggleSheet("constantsOverlay","constantsSheet",false); });
+
+  /* ============================================================
+     CONSTANTS LIBRARY UI
+     ============================================================ */
+  function renderConstantsList(filter){
+    const wrap = $("constLibraryList");
+    wrap.innerHTML = "";
+    const q = (filter||"").trim().toLowerCase();
+    Object.keys(CONSTANTS_LIBRARY).forEach(group => {
+      const items = CONSTANTS_LIBRARY[group].filter(c =>
+        !q || c.name.toLowerCase().includes(q) || c.symbol.toLowerCase().includes(q)
+      );
+      if(!items.length) return;
+      const title = document.createElement("div");
+      title.className = "const-group-title";
+      title.textContent = group;
+      wrap.appendChild(title);
+      const list = document.createElement("ul");
+      list.className = "const-list";
+      items.forEach(c => {
+        const li = document.createElement("li");
+        li.innerHTML = `<span class="const-sym">${c.symbol}</span><span class="const-name">${c.name}</span><span class="const-value">${c.value} ${c.unit!=="—"?c.unit:""}</span>`;
+        list.appendChild(li);
+      });
+      wrap.appendChild(list);
+    });
+  }
+  $("openConstants").addEventListener("click", () => {
+    renderConstantsList("");
+    toggleSheet("constantsOverlay","constantsSheet", true);
+  });
+  $("closeConstants").addEventListener("click", () => toggleSheet("constantsOverlay","constantsSheet", false));
+  $("constSearch").addEventListener("input", (e) => renderConstantsList(e.target.value));
+
+  /* ============================================================
+     FOOTER NAV
+     ============================================================ */
+  function goToStep(stepId){
+    document.querySelectorAll(".step").forEach(s => s.classList.remove("active"));
+    $(stepId).classList.add("active");
+    document.querySelectorAll("footer button").forEach(b => {
+      b.classList.toggle("active", b.dataset.step === stepId);
+    });
+    window.scrollTo({top:0, behavior:"smooth"});
+  }
+  document.querySelectorAll("footer button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      // only allow navigating to steps that already have data, or step 1 always
+      if(btn.dataset.step === "stepCapture" || state.result){
+        goToStep(btn.dataset.step);
+      }
+    });
+  });
+
+  /* ============================================================
+     IMAGE CAPTURE / UPLOAD / TYPED QUESTION
+     ============================================================ */
+  function updateAnalyzeAvailability(){
+    const hasImage = !!state.imageBase64;
+    const hasText = $("typedQuestion").value.trim().length > 0;
+    $("analyzeBtn").disabled = !(hasImage || hasText);
+  }
+
+  function handleFile(file){
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target.result;
+      state.imageBase64 = dataUrl.split(",")[1];
+      state.imageMime = file.type || "image/jpeg";
+      $("previewImg").src = dataUrl;
+      $("previewName").textContent = file.name || "captured-photo.jpg";
+      $("previewWrap").style.display = "block";
+      // typing and photo are mutually exclusive inputs for a single question
+      $("typedQuestion").value = "";
+      $("typeWrap").style.display = "none";
+      $("orDivider").style.display = "none";
+      updateAnalyzeAvailability();
+      setError(null);
+    };
+    reader.readAsDataURL(file);
+  }
+  $("cameraInput").addEventListener("change", (e) => handleFile(e.target.files[0]));
+  $("galleryInput").addEventListener("change", (e) => handleFile(e.target.files[0]));
+  $("clearImage").addEventListener("click", () => {
+    state.imageBase64 = null; state.imageMime = null;
+    $("previewWrap").style.display = "none";
+    $("cameraInput").value = ""; $("galleryInput").value = "";
+    $("typeWrap").style.display = "block";
+    $("orDivider").style.display = "flex";
+    updateAnalyzeAvailability();
+  });
+
+  $("typedQuestion").addEventListener("input", (e) => {
+    if(e.target.value.trim().length > 0){
+      // typing and photo are mutually exclusive inputs for a single question
+      state.imageBase64 = null; state.imageMime = null;
+      $("previewWrap").style.display = "none";
+      $("cameraInput").value = ""; $("galleryInput").value = "";
+    }
+    updateAnalyzeAvailability();
+  });
+
+  /* ============================================================
+     GEMINI CALL — routed through the shared backend
+     (functions/api/solve.js). The backend holds the API keys (as
+     environment variables) and does the multi-key fallback
+     server-side, so this client code never sees or manages keys.
+     ============================================================ */
+  async function callGemini(parts, {json=true} = {}){
+    const url = DEFAULT_BACKEND_URL;
+    if(!url || url.indexOf("YOUR-PROJECT") !== -1){
+      throw new Error("The shared backend hasn't been set up yet. The app admin needs to deploy functions/api/solve.js and set DEFAULT_BACKEND_URL in index.html.");
+    }
+
+    let res, data;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parts: parts, json: json })
+      });
+      data = await res.json();
+    } catch(err){
+      throw new Error("Could not reach the shared backend. Check your internet connection or the backend URL in index.html.");
+    }
+    if(!res.ok){
+      throw new Error((data && data.error) || ("Backend request failed (" + res.status + ")"));
+    }
+    const text = data && data.text;
+    if(!text) throw new Error("The model returned an empty response. Try a clearer photo of the question.");
+    if(json){
+      try {
+        return JSON.parse(text);
+      } catch(err){
+        const match = text.match(/\{[\s\S]*\}/);
+        if(match) return JSON.parse(match[0]);
+        throw new Error("Could not parse the model's response as JSON.");
+      }
+    }
+    return text;
+  }
+
+  const ANALYSIS_INSTRUCTION = `You are NSMQ FormulaGen, a tutor that reads a photo of a science or math question and prepares it for step-by-step solving.
+
+Look at the image and return ONLY a JSON object with exactly this shape, no markdown fences, no commentary:
+
+{
+  "subject": "Physics" | "Chemistry" | "Math" | other short subject label,
+  "extractedQuestion": "the question text as best you can read it from the image",
+  "formula": "the single formula needed to solve this, using standard symbols, e.g. E = hc / \\u03bb",
+  "variables": [ { "symbol": "E", "name": "energy of the photon", "unit": "J", "isConstant": false } , ... one entry per symbol in the formula, marking physical/mathematical constants with isConstant:true ],
+  "constants": [ { "symbol": "h", "name": "Planck's constant", "value": "6.626e-34", "unit": "J*s" }, ... only the constants that appear in the formula, with standard numeric values ],
+  "givenValues": [ { "symbol": "\\u03bb", "name": "wavelength", "value": "500e-9", "unit": "m" }, ... only values explicitly given in the question, extracted with correct units, converted to SI base units where sensible ],
+  "simplifiedFormula": "the formula with all constants multiplied/divided together into a single numeric coefficient, e.g. E = 1.98e-25 / \\u03bb",
+  "simplificationExplanation": "one short block of plain arithmetic showing how the constants combined into that coefficient, e.g. h times c = 6.626e-34 times 3e8 = 1.988e-25",
+  "solutionSteps": [ "step 1: substitute the given value into the simplified formula", "step 2: ...", "step 3: ..." ],
+  "finalAnswer": "the final numeric answer with correct units, e.g. 3.96e-19 J"
+}
+
+Use plain, readable numbers (scientific notation with 'e' or with unicode superscripts is fine, be consistent). If a value in the question uses non-SI units, convert to SI base units for the calculation and note the conversion in solutionSteps. If the image contains more than one question, solve only the first one. Be precise with units throughout.`;
+
+  const RECALC_INSTRUCTION_TEMPLATE = (simplifiedFormula, givens) => `You are NSMQ FormulaGen. The simplified formula is:
+
+${simplifiedFormula}
+
+The given values (possibly edited by the user) are:
+${givens.map(g=>`${g.symbol} = ${g.value} ${g.unit||""}`).join("\n")}
+
+Return ONLY a JSON object with exactly this shape, no markdown fences, no commentary:
+{
+  "solutionSteps": [ "step 1: ...", "step 2: ...", "step 3: ..." ],
+  "finalAnswer": "the final numeric answer with correct units"
+}`;
+
+  /* ============================================================
+     ANALYZE FLOW
+     ============================================================ */
+  function setStatus(msg){
+    $("status").style.display = msg ? "flex" : "none";
+    $("statusText").textContent = msg || "";
+  }
+  function setError(msg){
+    $("errorBox").style.display = msg ? "block" : "none";
+    $("errorBox").textContent = msg || "";
+  }
+
+  $("analyzeBtn").addEventListener("click", async () => {
+    const typedText = $("typedQuestion").value.trim();
+    if(!state.imageBase64 && !typedText) return;
+    setError(null);
+    setStatus("Reading the question and finding the formula…");
+    $("analyzeBtn").disabled = true;
+    try {
+      let parts;
+      if(state.imageBase64){
+        parts = [
+          { text: ANALYSIS_INSTRUCTION },
+          { inline_data: { mime_type: state.imageMime, data: state.imageBase64 } }
+        ];
+      } else {
+        parts = [
+          { text: ANALYSIS_INSTRUCTION + `\n\nThe question was typed directly by the user rather than photographed. Here it is:\n"""\n${typedText}\n"""` }
+        ];
+      }
+      const result = await callGemini(parts, {json:true});
+      state.result = result;
+      state.editedGivens = JSON.parse(JSON.stringify(result.givenValues || []));
+      state.givensDirty = false;
+      renderFormulaStep(result);
+      renderSimplifyStep(result);
+      renderSolveStep(result);
+      setStatus(null);
+      goToStep("stepFormula");
+    } catch(err){
+      setStatus(null);
+      setError(err.message || "Something went wrong analyzing the question.");
+    } finally {
+      updateAnalyzeAvailability();
+    }
+  });
+
+  /* ============================================================
+     RENDER: STEP 2 — FORMULA
+     ============================================================ */
+  function renderFormulaStep(r){
+    $("subjectTag").textContent = (r.subject || "SUBJECT").toUpperCase();
+    $("questionEcho").textContent = r.extractedQuestion ? `“${r.extractedQuestion}”` : "";
+    $("formulaDisplay").textContent = r.formula || "";
+
+    const defList = $("defList");
+    defList.innerHTML = "";
+    (r.variables || []).forEach(v => {
+      const li = document.createElement("li");
+      li.innerHTML = `<span class="def-sym">${v.symbol}</span><span class="def-name">${v.name}${v.unit ? ` <span class="unit">(${v.unit})</span>` : ""}</span>`;
+      defList.appendChild(li);
+    });
+
+    const constUsed = $("constUsedList");
+    constUsed.innerHTML = "";
+    (r.constants || []).forEach(c => {
+      const li = document.createElement("li");
+      li.innerHTML = `<span class="const-sym">${c.symbol}</span><span class="const-name">${c.name}</span><span class="const-value">${c.value} ${c.unit||""}</span>`;
+      constUsed.appendChild(li);
+    });
+    if((r.constants||[]).length === 0){
+      constUsed.innerHTML = `<li style="color:var(--ink-soft); font-style:italic;">No fixed constants in this formula.</li>`;
+    }
+
+    renderGivenInputs();
+    renderSymbolPalette();
+  }
+
+  function renderGivenInputs(){
+    const wrap = $("givenList");
+    wrap.innerHTML = "";
+    if(state.editedGivens.length === 0){
+      wrap.innerHTML = `<p style="font-size:13px; color:var(--ink-soft); font-style:italic; margin:0 0 10px;">No explicit given values were detected — check the question echoed above and edit the formula step if something's missing.</p>`;
+      return;
+    }
+    state.editedGivens.forEach((g, idx) => {
+      const row = document.createElement("div");
+      row.className = "given-row";
+      row.innerHTML = `
+        <label>${g.symbol}</label>
+        <input type="text" class="sym-input" data-idx="${idx}" value="${g.value}">
+        <span class="unit-badge">${g.unit||""}</span>
+      `;
+      wrap.appendChild(row);
+    });
+    wrap.querySelectorAll("input.sym-input").forEach(inp => {
+      inp.addEventListener("input", (e) => {
+        state.editedGivens[e.target.dataset.idx].value = e.target.value;
+        state.givensDirty = true;
+      });
+      inp.addEventListener("focus", (e) => { activeInput = e.target; });
+    });
+  }
+
+  let activeInput = null;
+  function renderSymbolPaletteInto(containerId){
+    const wrap = $(containerId);
+    wrap.innerHTML = "";
+    SYMBOLS.forEach(sym => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = sym;
+      btn.addEventListener("click", () => {
+        if(activeInput){
+          const start = (typeof activeInput.selectionStart === "number") ? activeInput.selectionStart : activeInput.value.length;
+          const end = (typeof activeInput.selectionEnd === "number") ? activeInput.selectionEnd : activeInput.value.length;
+          const val = activeInput.value;
+          activeInput.value = val.slice(0,start) + sym + val.slice(end);
+          activeInput.dispatchEvent(new Event("input"));
+          activeInput.focus();
+          const pos = start + sym.length;
+          activeInput.setSelectionRange(pos,pos);
+        }
+      });
+      wrap.appendChild(btn);
+    });
+  }
+  function renderSymbolPalette(){
+    renderSymbolPaletteInto("symbolPalette");
+  }
+  // capture-screen palette is available as soon as the page loads, so the
+  // user can insert symbols while typing a question before any analysis runs
+  renderSymbolPaletteInto("captureSymbolPalette");
+  $("typedQuestion").addEventListener("focus", () => { activeInput = $("typedQuestion"); });
+
+  $("continueToSimplify").addEventListener("click", () => goToStep("stepSimplify"));
+
+  /* ============================================================
+     RENDER: STEP 3 — SIMPLIFY
+     ============================================================ */
+  function renderSimplifyStep(r){
+    $("arithBlock").textContent = r.simplificationExplanation || "—";
+    $("simplifiedFormulaBox").textContent = r.simplifiedFormula || r.formula || "";
+  }
+  $("continueToSolve").addEventListener("click", () => goToStep("stepSolve"));
+
+  /* ============================================================
+     RENDER: STEP 4 — SOLVE
+     ============================================================ */
+  function renderSolveStep(r){
+    const list = $("solveSteps");
+    list.innerHTML = "";
+    (r.solutionSteps || []).forEach(step => {
+      const li = document.createElement("li");
+      li.textContent = step;
+      list.appendChild(li);
+    });
+    $("finalAnswer").textContent = r.finalAnswer || "—";
+  }
+
+  $("editValuesBtn").addEventListener("click", () => goToStep("stepFormula"));
+
+  $("startOverBtn").addEventListener("click", () => {
+    state = { imageBase64:null, imageMime:null, result:null, editedGivens:[], givensDirty:false };
+    $("previewWrap").style.display = "none";
+    $("cameraInput").value = ""; $("galleryInput").value = "";
+    $("typedQuestion").value = "";
+    $("typeWrap").style.display = "block";
+    $("orDivider").style.display = "flex";
+    updateAnalyzeAvailability();
+    setError(null); setStatus(null);
+    goToStep("stepCapture");
+  });
+
+  // Recalculate: only re-query Gemini for a fresh solve when the user has
+  // actually edited a given value since the last analysis or recalculation.
+  async function recalcSolve(){
+    if(!state.result || !state.givensDirty) return;
+    setError(null);
+    setStatus("Recalculating with your edited values…");
+    try {
+      const parts = [{ text: RECALC_INSTRUCTION_TEMPLATE(state.result.simplifiedFormula || state.result.formula, state.editedGivens) }];
+      const r2 = await callGemini(parts, {json:true});
+      state.result.solutionSteps = r2.solutionSteps;
+      state.result.finalAnswer = r2.finalAnswer;
+      renderSolveStep(state.result);
+      state.givensDirty = false;
+      setStatus(null);
+    } catch(err){
+      setStatus(null);
+      setError(err.message || "Could not recalculate.");
+    }
+  }
+  // check for edits whenever the user moves toward simplify/solve
+  $("continueToSimplify").addEventListener("click", () => { recalcSolve(); });
+  $("editValuesBtn").addEventListener("click", () => { state.givensDirty = false; });
+
+})();
+</script>
+</body>
+</html>
